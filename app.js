@@ -16,9 +16,7 @@ const itemsSchema = {
   name: String
 }
 
-const Item = mongoose.model(
-  "Item", itemsSchema
-)
+const Item = mongoose.model("Item", itemsSchema)
 
 const item1 = new Item({
   name: "Welcome to your todo list"
@@ -31,6 +29,13 @@ const item3 = new Item({
 })
 
 const defaultItems = [item1, item2, item3]
+
+const listSchema = {
+  name: String,
+  items: [itemsSchema]
+}
+
+const List = mongoose.model("List", listSchema)
 
 app.get('/', function (req, res) {
 
@@ -53,9 +58,28 @@ app.get('/', function (req, res) {
     }
   });
 
+});
 
-  // const day = date.getDate()
+app.get('/:customeListName', function (req, res) {
+  const customeListName = req.params.customeListName
 
+  List.findOne({ name: customeListName }, function (err, foundList) {
+    if (!err) {
+      if (!foundList) {
+        //Create a new list 
+        const list = new List({
+          name: customeListName,
+          items: defaultItems
+        })
+        list.save();
+        res.redirect("/" + customeListName)
+
+
+      } else {
+        res.render("list", { listTitle: foundList.name, newListItem: foundList.items })
+      }
+    }
+  });
 
 });
 
