@@ -1,7 +1,9 @@
 const express = require('express')
 const bodyParser = require('body-parser')
 const mongoose = require('mongoose')
-const date = require(__dirname + "/date.js")
+// const date = require(__dirname + "/date.js")
+const _ = require("lodash")
+
 
 const app = express()
 
@@ -10,7 +12,7 @@ app.set('view engine', 'ejs')
 app.use(bodyParser.urlencoded({ extended: true }))
 app.use(express.static("public"))
 
-mongoose.connect("mongodb://localhost:27017/todolistDB", { useNewUrlParser: true })
+mongoose.connect("mongodb://localhost:27017/todolistDB", { useNewUrlParser: true }, { useFindAndModify: false })
 
 const itemsSchema = {
   name: String
@@ -61,7 +63,7 @@ app.get('/', function (req, res) {
 });
 
 app.get('/:customeListName', function (req, res) {
-  const customeListName = req.params.customeListName
+  const customeListName = _.capitalize(req.params.customeListName)
 
   List.findOne({ name: customeListName }, function (err, foundList) {
     if (!err) {
@@ -73,8 +75,6 @@ app.get('/:customeListName', function (req, res) {
         })
         list.save();
         res.redirect("/" + customeListName)
-
-
       } else {
         res.render("list", { listTitle: foundList.name, newListItem: foundList.items })
       }
@@ -85,38 +85,50 @@ app.get('/:customeListName', function (req, res) {
 
 app.post('/', function (req, res) {
 
+  // value of users' input stored in the name of input in form 'newItem'
   const itemName = req.body.newItem
+
+  // value of title stored in the name of button in form 'listTitle'
+  const listName = req.body.list
 
   const item = new Item({
     name: itemName
   })
 
-  // save itemName into the collection of item
-  item.save()
-
-  res.redirect('/')
-
-
-  // if (req.body.list === 'Work') {
-  //   workItems.push(item)
-  //   res.redirect("/work")
-  // } else {
-
-  //   items.push(item)
-  //   res.redirect('/')
-  // }
-  // console.log(req.body)
-
+  //if the list name triggered by post request is not the default "Today" it will find the custome list and then
+  // addthat item to the custome list
+  if (listName === "Today") {
+    item.save()
+    res.redirect('/')
+  } else {
+    List.findOne(
+      { name: listName }, function (err, foundList) {
+        foundList.items.push(item)
+        foundList.save()
+        res.redirect("/" + listName)
+        console.log(listName)
+      })
+  }
 })
 
 app.post('/delete', function (req, res) {
   const checkedItemId = req.body.checkbox
-  Item.findByIdAndDelete(checkedItemId, function (err) {
-    if (!err) {
-      console.log("Successfully deletion")
-      res.redirect('/')
-    }
-  })
+  const listName = req.body.listName
+
+  if (listName === "Today") {
+    Item.findByIdAndDelete(checkedItemId, function (err) {
+      if (!err) {
+        console.log("Successfully deletion")
+        res.redirect('/')
+      }
+    })
+  } else {
+    List.findOneAndUpdate({ name: listName }, { $pull: { items: { _id: checkedItemId } } }, function (err, foundList) {
+      if (!err) {
+        res.redirect("/" + listName)
+      }
+    })
+  }
 })
 
 app.get("/work", function (req, res) {
